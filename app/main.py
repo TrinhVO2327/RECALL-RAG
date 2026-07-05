@@ -2,6 +2,10 @@ from fastapi import FastAPI, HTTPException, UploadFile
 
 from app.ingest import chunk_text, extract_text_from_pdf
 
+import uuid
+
+from app.vectorstore import add_chunks, search
+
 
 
 app = FastAPI(
@@ -36,11 +40,22 @@ async def upload_document(file: UploadFile):
         )
     
     chunks = chunk_text(text)
+    document_id = str(uuid.uuid4())
+    stored = add_chunks(document_id, file.filename or "unknown", chunks)
 
     return {
+        "document_id": document_id,
         "filename": file.filename,
         "characters": len(text),
         "chunk_count": len(chunks),
         "preview":  chunks[0][:300] if chunks else "",
     }
+
+@app.get("/search")
+def search_chunks(q: str, top_k: int = 4):
+    """Find the chunks most relevant in meaning to the query."""
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="Query cannot be empty.")
+    return {"query": q,"results": search(q, top_k)}
+
     
