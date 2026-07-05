@@ -6,6 +6,9 @@ import uuid
 
 from app.vectorstore import add_chunks, search
 
+from app.rag import answer_question
+
+
 
 
 app = FastAPI(
@@ -58,4 +61,10 @@ def search_chunks(q: str, top_k: int = 4):
         raise HTTPException(status_code=422, detail="Query cannot be empty.")
     return {"query": q,"results": search(q, top_k)}
 
+@app.get("/ask")
+def ask_question(q: str, top_k: int = 4):
+    """Answer a question grounded in the uploaded documents, with citations."""
+    if not q.strip():
+        raise HTTPException(status_code=422, detail="Question must not be empty")
+    return answer_question(q, top_k)
     
