@@ -10,6 +10,13 @@ from app.rag import answer_question
 
 from app.quiz import generate_quiz
 
+from datetime import date, timedelta
+
+from app.database import Base, engine, get_session
+from app.models import Card, Review
+from app.scheduler import ReviewState, review as apply_review
+
+Base.metadata.create_all(engine)  # creates recall.db + tables on startup
 
 app = FastAPI(
     title ="RecallRAG",
@@ -75,4 +82,59 @@ def create_quiz(document_id: str, num_cards: int = 5):
         cards = generate_quiz(document_id, num_cards)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
-    return {"document_id": document_id, "cards": [c.model_dump() for c in cards]}
+    
+    with get_session() as session:
+        db_cards = [
+            Card(document_id=document_id, question=c.question,
+                 answer=c.answer, explanation=c.explanation)
+            for c in cards
+        ]
+        session.add_all(db_cards)
+        session.commit()
+        saved = [{"id": c.id, "question": c.question} for c in db_cards]
+
+    return {"document_id": document_id, "cards_saved": len(saved), "cards": saved}
+
+@app.get("/due")
+def due_cards():
+    """Cards whose review date has arrived."""
+    with get_session() as session:
+        cards = session.query(Card).filter(Card.due_date <= date.today()).all()
+        return {
+            "due_count": len(cards),
+            "cards": [
+                {"id": c.id, "question": c.question, "answer": c.answer,
+                 "explanation": c.explanation}
+                for c in cards
+            ],
+        }
+    
+
+@app.post("/review/{card_id}")
+def review_card(card_id: int, grade: int):
+    """Submit a 0-5 self-grade; SM-2 reschedules the card."""
+    if not 0 <= grade <= 5:
+        raise HTTPException(status_code=422, detail="grade must be 0-5")
+
+    with get_session() as session:
+        card = session.get(Card, card_id)
+        if card is None:
+            raise HTTPException(status_code=404, detail="card not found")
+
+        state = ReviewState(card.repetitions, card.interval_days, card.ease_factor)
+        new_state = apply_review(state, grade)
+
+        card.repetitions = new_state.repetitions
+        card.interval_days = new_state.interval_days
+        card.ease_factor = new_state.ease_factor
+        card.due_date = date.today() + timedelta(days=new_state.interval_days)
+        session.add(Review(card_id=card.id, grade=grade))
+        session.commit()
+
+        return {
+            "card_id": card.id,
+            "next_review_in_days": new_state.interval_days,
+            "due_date": card.due_date.isoformat(),
+            "ease_factor": round(new_state.ease_factor, 2),
+        }
+    
