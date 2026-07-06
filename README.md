@@ -8,6 +8,8 @@ Built with FastAPI, sentence-transformers, ChromaDB, SQLAlchemy, and the
 Anthropic API.
 
 ## How it works
+
+'''
 ┌─────────────┐
 PDF upload ──────►│   Ingest    │  extract text (pdfplumber)
 │             │  split into overlapping chunks
@@ -32,6 +34,7 @@ PDF upload ──────►│   Ingest    │  extract text (pdfplumber)
 │ scheduler +  │
 │ SQLite       │
 └──────────────┘
+'''
 
 ## Features
 
