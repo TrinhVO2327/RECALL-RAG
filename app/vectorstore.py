@@ -41,3 +41,9 @@ def search(query: str, top_k: int=4) -> list[dict]:
             }
         )
     return hits
+
+def get_document_chunks(document_id: str, limit: int = 10) -> list[str]:
+    """Fetch stored chunks belonging to one document."""
+    results = _collection.get(where={"document_id": document_id}, limit=limit)
+    return results["documents"] or []
+

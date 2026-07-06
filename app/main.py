@@ -8,7 +8,7 @@ from app.vectorstore import add_chunks, search
 
 from app.rag import answer_question
 
-
+from app.quiz import generate_quiz
 
 
 app = FastAPI(
@@ -50,7 +50,7 @@ async def upload_document(file: UploadFile):
         "document_id": document_id,
         "filename": file.filename,
         "characters": len(text),
-        "chunk_count": len(chunks),
+        "chunk_stored": stored,
         "preview":  chunks[0][:300] if chunks else "",
     }
 
@@ -67,4 +67,12 @@ def ask_question(q: str, top_k: int = 4):
     if not q.strip():
         raise HTTPException(status_code=422, detail="Question must not be empty")
     return answer_question(q, top_k)
-    
+
+@app.post("/generate-quiz")
+def create_quiz(document_id: str, num_cards: int = 5):
+    """Generate quiz cards from an uploaded document."""
+    try:
+        cards = generate_quiz(document_id, num_cards)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return {"document_id": document_id, "cards": [c.model_dump() for c in cards]}
