@@ -35,3 +35,17 @@ def chunk_text(text: str, chunk_size: int = 800, overlap: int =150) -> list[str]
             break
         start += step
     return chunks
+
+
+import trafilatura
+
+
+def extract_text_from_url(url: str) -> str:
+    """Fetch a web page and extract its main article text."""
+    downloaded = trafilatura.fetch_url(url)
+    if downloaded is None:
+        raise ValueError(f"Could not fetch {url}")
+    text = trafilatura.extract(downloaded)
+    return text or ""
+
+

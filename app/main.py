@@ -1,6 +1,6 @@
 from fastapi import FastAPI, HTTPException, UploadFile
 
-from app.ingest import chunk_text, extract_text_from_pdf
+from app.ingest import chunk_text, extract_text_from_pdf, extract_text_from_url
 
 import uuid
 
@@ -151,5 +151,34 @@ def explain_card(card_id: int):
         alt = explain_differently(card.question, card.answer, card.explanation)
         return {"card_id": card.id, "alternative_explanation": alt}
     
-    
-    
+
+
+@app.post("/upload-url")
+def upload_url(url: str):
+    """Ingest a web page as study material."""
+    if not url.startswith(("http://", "https://")):
+        raise HTTPException(status_code=422, detail="URL must start with http(s)://")
+
+    try:
+        text = extract_text_from_url(url)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    if not text.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="No readable article text found at that URL",
+        )
+
+    chunks = chunk_text(text)
+    document_id = str(uuid.uuid4())
+    stored = add_chunks(document_id, url, chunks)
+
+    return {
+        "document_id": document_id,
+        "source": url,
+        "characters": len(text),
+        "chunks_stored": stored,
+        "preview": chunks[0][:300] if chunks else "",
+    }
+
