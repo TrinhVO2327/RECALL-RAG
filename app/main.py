@@ -8,13 +8,15 @@ from app.vectorstore import add_chunks, search
 
 from app.rag import answer_question
 
-from app.quiz import generate_quiz
+from app.quiz import generate_quiz, explain_differently 
 
 from datetime import date, timedelta
 
 from app.database import Base, engine, get_session
 from app.models import Card, Review
 from app.scheduler import ReviewState, review as apply_review
+
+
 
 Base.metadata.create_all(engine)  # creates recall.db + tables on startup
 
@@ -137,4 +139,17 @@ def review_card(card_id: int, grade: int):
             "due_date": card.due_date.isoformat(),
             "ease_factor": round(new_state.ease_factor, 2),
         }
+    
+
+@app.post("/explain/{card_id}")
+def explain_card(card_id: int):
+    """Alternative explanation for a card the user failed to recall."""
+    with get_session() as session:
+        card = session.get(Card, card_id)
+        if card is None:
+            raise HTTPException(status_code=404, detail="card not found")
+        alt = explain_differently(card.question, card.answer, card.explanation)
+        return {"card_id": card.id, "alternative_explanation": alt}
+    
+    
     

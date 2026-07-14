@@ -56,3 +56,30 @@ def generate_quiz(document_id: str, num_cards: int = 5) -> list[QuizCard]:
         return [QuizCard(**card) for card in parsed]
     except (json.JSONDecodeError, ValidationError) as exc:
         raise ValueError(f"LLM returned malformed quiz data: {exc}") from exc
+    
+
+def explain_differently(question: str, answer: str, explanation: str) -> str:
+    """Re-explain a card's concept from a different angle for a struggling student."""
+    message = _client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=400,
+        system=(
+            "A student just failed to recall this flashcard. Re-explain the SAME "
+            "concept a DIFFERENT way: use a new angle, analogy, or breakdown. "
+            "Stay strictly consistent with the given answer — do not introduce "
+            "new facts. Be concise (3-5 sentences) and encouraging in tone, "
+            "not condescending."
+        ),
+        messages=[
+            {
+                "role": "user",
+                "content": (
+                    f"Question: {question}\n"
+                    f"Correct answer: {answer}\n"
+                    f"Original explanation that didn't land: {explanation}"
+                ),
+            }
+        ],
+    )
+    return "".join(block.text for block in message.content if block.type == "text")
+
